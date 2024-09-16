@@ -24,6 +24,8 @@ type StreamLaunchOptions = LaunchOptions &
 	};
 let port: number;
 
+console.log("[Initializing....]");
+
 export const wss = (async () => {
 	for (let i = 55200; i <= 65535; i++) {
 		const ws = new WebSocketServer({ port: i });
