@@ -153,7 +153,7 @@ export async function launch(
 export async function createWebSocketServer(startPort = 55200, endPort = 65535) {
 	for (let i = startPort; i <= endPort; i++) {
 		// @ts-ignore
-		ws = new WebSocket.WebSocketServer({ port: i });
+		ws = new WebSocketServer({ port: i });
 
 		try {
 			const result = await Promise.race([
