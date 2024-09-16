@@ -2,8 +2,8 @@
 	"name": "puppeteer-stream",
 	"version": "3.0.15",
 	"description": "",
-	"main": "dist/PuppeteerStream.js",
-	"types": "dist/PuppeteerStream.d.ts",
+	"main": "build/PuppeteerStream.js",
+	"types": "build/PuppeteerStream.d.ts",
 	"scripts": {},
 	"keywords": [
 		"puppeteer",
