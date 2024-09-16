@@ -264,8 +264,6 @@ async function getStream(page, opts) {
 			ws.off("connection", onConnection);
 		}
 		ws.on("message", (data) => {
-			// @ts-ignore
-			console.log(data);
 			stream.write(data);
 		});
 		ws.on("close", close);
