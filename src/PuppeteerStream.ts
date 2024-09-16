@@ -23,30 +23,29 @@ type StreamLaunchOptions = LaunchOptions &
 		extensionPath?: string;
 	};
 let port: number;
+let ws: any;
 
-console.log("[Initializing....]");
-
-export const wss = (async () => {
-	for (let i = 55200; i <= 65535; i++) {
-		const ws = new WebSocketServer({ port: i });
-		const promise = await Promise.race([
-			new Promise((resolve) => {
-				ws.on("error", (e: any) => {
-					resolve(!e.message.includes("EADDRINUSE"));
-				});
-			}),
-			new Promise((resolve) => {
-				ws.on("listening", () => {
-					resolve(true);
-				});
-			}),
-		]);
-		if (promise) {
-			port = i;
-			return ws;
-		}
-	}
-})();
+// export const wss = (async () => {
+// 	for (let i = 55200; i <= 65535; i++) {
+// 		const ws = new WebSocketServer({ port: i });
+// 		const promise = await Promise.race([
+// 			new Promise((resolve) => {
+// 				ws.on("error", (e: any) => {
+// 					resolve(!e.message.includes("EADDRINUSE"));
+// 				});
+// 			}),
+// 			new Promise((resolve) => {
+// 				ws.on("listening", () => {
+// 					resolve(true);
+// 				});
+// 			}),
+// 		]);
+// 		if (promise) {
+// 			port = i;
+// 			return ws;
+// 		}
+// 	}
+// })();
 
 export async function launch(
 	arg1: StreamLaunchOptions | { launch?: Function; [key: string]: any },
@@ -148,6 +147,50 @@ export async function launch(
 	};
 
 	return browser;
+}
+
+// @ts-ignore
+export async function createWebSocketServer(startPort = 55200, endPort = 65535) {
+	for (let i = startPort; i <= endPort; i++) {
+		// @ts-ignore
+		ws = new ws_1.WebSocketServer({ port: i });
+
+		try {
+			const result = await Promise.race([
+				new Promise((resolve) => {
+					// @ts-ignore
+					ws.on("error", (e) => {
+						if (e.message.includes("EADDRINUSE")) {
+							resolve(false); // Port in use
+						} else {
+							console.error(`WebSocket error: ${e.message}`);
+							resolve(false); // Handle other errors
+						}
+					});
+				}),
+				new Promise((resolve) => {
+					// @ts-ignore
+					ws.on("listening", () => {
+						resolve(true); // Port available
+					});
+				}),
+			]);
+
+			if (result) {
+				port = i;
+				console.log(`Port ${port} is available`);
+				return { ws, port };
+			} else {
+				ws.close(); // Close the server if the port is not available
+				console.log(`Port ${i} is not available, trying next`);
+			}
+		} catch (error) {
+			console.error(`Unexpected error: ${error.message}`);
+			if (ws) ws.close(); // Ensure the server is closed in case of unexpected errors
+		}
+	}
+
+	throw new Error("No available ports found in the range.");
 }
 
 export type BrowserMimeType =
@@ -283,7 +326,7 @@ export async function getStream(page: Page, opts: getStreamOptions) {
 					if (ws.readyState != WebSocket.CLOSED) ws.close();
 				}, opts.streamConfig?.closeTimeout ?? 5000);
 			}
-			(await wss).off("connection", onConnection);
+			ws.off("connection", onConnection);
 		}
 
 		ws.on("message", (data) => {
@@ -295,7 +338,7 @@ export async function getStream(page: Page, opts: getStreamOptions) {
 		stream.on("close", close);
 	}
 
-	(await wss).on("connection", onConnection);
+	ws.on("connection", onConnection);
 
 	await page.bringToFront();
 	await assertExtensionLoaded(extension, retryPolicy);
