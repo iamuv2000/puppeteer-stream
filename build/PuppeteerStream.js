@@ -170,42 +170,45 @@ async function createWebSocketServer(startPort = 55200, endPort = 65535) {
 	const maxAttempts = endPort - startPort + 1;
 
 	while (attemptedPorts.size < maxAttempts) {
-		const port = Math.floor(Math.random() * (endPort - startPort + 1)) + startPort;
+		const i = Math.floor(Math.random() * (endPort - startPort + 1)) + startPort;
+		if (attemptedPorts.has(i)) continue;
+		attemptedPorts.add(i);
 
-		if (attemptedPorts.has(port)) continue;
-		attemptedPorts.add(port);
-
-		let ws;
+		// @ts-ignore
+		ws = new ws_1.WebSocketServer({ port: i });
 
 		try {
-			ws = new WebSocketServer({ port });
-
 			const result = await Promise.race([
 				new Promise((resolve) => {
-					ws.on("error", (e) => {
+					// @ts-ignore
+					ws.once("error", (e) => {
 						if (e.message.includes("EADDRINUSE")) {
-							resolve(false);
+							resolve(false); // Port in use
 						} else {
-							console.error(`[RACE_CONDITION] ~ WebSocket error on port ${port}: ${e.message}`);
-							resolve(false);
+							console.error(`[RACE_CONDITION] ~ WebSocket error: ${e.message}`);
+							resolve(false); // Handle other errors
 						}
 					});
 				}),
 				new Promise((resolve) => {
-					ws.on("listening", () => resolve(true));
+					// @ts-ignore
+					ws.once("listening", () => {
+						resolve(true); // Port available
+					});
 				}),
 			]);
 
 			if (result) {
-				console.log(`[RACE_CONDITION] ~  WebSocket server started on port ${port}`);
+				port = i;
+				console.log(`[RACE_CONDITION] ~ Port ${port} is available`);
 				return { ws, port };
 			} else {
-				ws.close();
-				console.log(`[RACE_CONDITION] ~  Port ${port} unavailable, retrying...`);
+				ws.close(); // Close the server if the port is not available
+				console.log(`[RACE_CONDITION] ~ Port ${i} is not available, trying next`);
 			}
 		} catch (error) {
-			console.error(`[RACE_CONDITION] ~  Unexpected error on port ${port}: ${error.message}`);
-			if (ws) ws.close();
+			console.error(`[RACE_CONDITION] ~ Unexpected error: ${error.message}`);
+			if (ws) ws.close(); // Ensure the server is closed in case of unexpected errors
 		}
 	}
 
