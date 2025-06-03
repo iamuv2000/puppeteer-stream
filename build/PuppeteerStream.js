@@ -165,43 +165,47 @@ function unlock() {
 	else mutex = false;
 }
 // @ts-ignore
-async function createWebSocketServer(startPort = 55200, endPort = 65535) {
-	for (let i = startPort; i <= endPort; i++) {
-		// @ts-ignore
-		ws = new ws_1.WebSocketServer({ port: i });
+export async function createWebSocketServer(startPort = 55200, endPort = 65535) {
+	const attemptedPorts = new Set();
+	const maxAttempts = endPort - startPort + 1;
+
+	while (attemptedPorts.size < maxAttempts) {
+		const port = Math.floor(Math.random() * (endPort - startPort + 1)) + startPort;
+
+		if (attemptedPorts.has(port)) continue;
+		attemptedPorts.add(port);
+
+		let ws;
 
 		try {
+			ws = new WebSocketServer({ port });
+
 			const result = await Promise.race([
 				new Promise((resolve) => {
-					// @ts-ignore
 					ws.on("error", (e) => {
 						if (e.message.includes("EADDRINUSE")) {
-							resolve(false); // Port in use
+							resolve(false);
 						} else {
-							console.error(`WebSocket error: ${e.message}`);
-							resolve(false); // Handle other errors
+							console.error(`[RACE_CONDITION] ~ WebSocket error on port ${port}: ${e.message}`);
+							resolve(false);
 						}
 					});
 				}),
 				new Promise((resolve) => {
-					// @ts-ignore
-					ws.on("listening", () => {
-						resolve(true); // Port available
-					});
+					ws.on("listening", () => resolve(true));
 				}),
 			]);
 
 			if (result) {
-				port = i;
-				console.log(`Port ${port} is available`);
+				console.log(`[RACE_CONDITION] ~  WebSocket server started on port ${port}`);
 				return { ws, port };
 			} else {
-				ws.close(); // Close the server if the port is not available
-				console.log(`Port ${i} is not available, trying next`);
+				ws.close();
+				console.log(`[RACE_CONDITION] ~  Port ${port} unavailable, retrying...`);
 			}
 		} catch (error) {
-			console.error(`Unexpected error: ${error.message}`);
-			if (ws) ws.close(); // Ensure the server is closed in case of unexpected errors
+			console.error(`[RACE_CONDITION] ~  Unexpected error on port ${port}: ${error.message}`);
+			if (ws) ws.close();
 		}
 	}
 
