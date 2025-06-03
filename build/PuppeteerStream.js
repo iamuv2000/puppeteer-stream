@@ -165,7 +165,7 @@ function unlock() {
 	else mutex = false;
 }
 // @ts-ignore
-export async function createWebSocketServer(startPort = 55200, endPort = 65535) {
+async function createWebSocketServer(startPort = 55200, endPort = 65535) {
 	const attemptedPorts = new Set();
 	const maxAttempts = endPort - startPort + 1;
 
