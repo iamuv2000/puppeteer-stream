@@ -48,7 +48,7 @@ let ws: any;
 // })();
 
 export async function launch(
-	arg1: StreamLaunchOptions | { launch?: Function; [key: string]: any },
+	arg1: StreamLaunchOptions | { launch?: Function;[key: string]: any },
 	opts?: StreamLaunchOptions
 ): Promise<Browser> {
 	//if puppeteer library is not passed as first argument, then first argument is options
@@ -150,47 +150,49 @@ export async function launch(
 }
 
 // @ts-ignore
-export async function createWebSocketServer(startPort = 55200, endPort = 65535) {
-	for (let i = startPort; i <= endPort; i++) {
-		// @ts-ignore
-		ws = new WebSocketServer({ port: i });
+export async function createWebSocketServer(startPort = 55200, endPort = 65535, maxAttempts = 100) {
+	const triedPorts = new Set();
+
+	for (let attempt = 0; attempt < maxAttempts; attempt++) {
+		const port = Math.floor(Math.random() * (endPort - startPort + 1)) + startPort;
+
+		if (triedPorts.has(port)) continue;
+		triedPorts.add(port);
+
+		let ws: any;
 
 		try {
+			// @ts-ignore
+			ws = new WebSocketServer({ port });
+
 			const result = await Promise.race([
-				new Promise((resolve) => {
-					// @ts-ignore
-					ws.on("error", (e) => {
-						if (e.message.includes("EADDRINUSE")) {
-							resolve(false); // Port in use
-						} else {
-							console.error(`WebSocket error: ${e.message}`);
-							resolve(false); // Handle other errors
+				new Promise<boolean>((resolve) => {
+					ws.on("error", (e: any) => {
+						if (!e.message.includes("EADDRINUSE")) {
+							console.error(`[Race Condition Fix] ~ WebSocket error on port ${port}: ${e.message}`);
 						}
+						resolve(false);
 					});
 				}),
-				new Promise((resolve) => {
-					// @ts-ignore
-					ws.on("listening", () => {
-						resolve(true); // Port available
-					});
+				new Promise<boolean>((resolve) => {
+					ws.on("listening", () => resolve(true));
 				}),
 			]);
 
 			if (result) {
-				port = i;
-				console.log(`Port ${port} is available`);
+				console.log(`[Race Condition Fix] ~  Port ${port} is available`);
 				return { ws, port };
 			} else {
-				ws.close(); // Close the server if the port is not available
-				console.log(`Port ${i} is not available, trying next`);
+				ws.close();
+				console.log(`[Race Condition Fix] ~  Port ${port} is not available, trying another`);
 			}
 		} catch (error) {
-			console.error(`Unexpected error: ${error.message}`);
-			if (ws) ws.close(); // Ensure the server is closed in case of unexpected errors
+			if (ws) ws.close();
+			console.error(`[Race Condition Fix] ~ Unexpected error on port ${port}: ${error.message}`);
 		}
 	}
 
-	throw new Error("No available ports found in the range.");
+	throw new Error("No available port found after multiple attempts.");
 }
 
 export type BrowserMimeType =
